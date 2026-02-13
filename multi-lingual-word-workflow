@@ -1,0 +1,69 @@
+name: word-of-the-day-api
+description: Generate a random word with translations in 23 languages for iPhone widget
+enabled: true
+tags:
+  - api
+  - word-of-day
+  - llm
+triggers:
+  - type: manual
+steps:
+  - name: generate_word
+    type: ai.prompt
+    with:
+      temperature: 0.9
+      prompt: |
+        You are a Word of the Day API that returns JSON responses.
+
+        Generate one random English word suitable for language learning (intermediate difficulty).
+
+        Translate it into ALL of these languages:
+        Arabic (ar), Cantonese (yue), Dutch (nl), French (fr), German (de), Greek (el),
+        Hebrew (he), Hindi (hi), Indonesian (id), Italian (it), Japanese (ja), Khmer (km),
+        Korean (ko), Mandarin (zh), Polish (pl), Portuguese (pt), Russian (ru), Spanish (es),
+        Swahili (sw), Tagalog (tl), Thai (th), Turkish (tr), Vietnamese (vi)
+
+        For languages with non-Latin scripts (ar, el, he, hi, ja, km, ko, ru, th, yue, zh),
+        include romanization/pronunciation in parentheses.
+
+        Return ONLY valid JSON with translations sorted alphabetically by language code:
+        {
+          "word": "the word",
+          "definition": "brief definition (max 50 chars)",
+          "translations": {
+            "ar": "translation (romanization)",
+            "de": "translation",
+            "el": "translation (romanization)",
+            "es": "translation",
+            "fr": "translation",
+            "he": "translation (romanization)",
+            "hi": "translation (romanization)",
+            "id": "translation",
+            "it": "translation",
+            "ja": "translation (romanization)",
+            "km": "translation (romanization)",
+            "ko": "translation (romanization)",
+            "nl": "translation",
+            "pl": "translation",
+            "pt": "translation",
+            "ru": "translation (romanization)",
+            "sw": "translation",
+            "th": "translation (romanization)",
+            "tl": "translation",
+            "tr": "translation",
+            "vi": "translation",
+            "yue": "translation (romanization)",
+            "zh": "translation (romanization)"
+          }
+        }
+
+        Rules:
+        - No markdown, no code blocks, no explanations
+        - Just raw JSON
+        - Keep definition under 50 characters
+        - Always include romanization for non-Latin scripts in parentheses
+        - Sort translations alphabetically by language code
+  - name: log_response
+    type: console
+    with:
+      message: ${{steps.generate_word.output.content}}
