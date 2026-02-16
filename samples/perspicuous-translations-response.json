@@ -1,0 +1,284 @@
+{
+  "word": "perspicuous",
+  "entries": [
+    {
+      "language": {
+        "code": "en",
+        "name": "English"
+      },
+      "partOfSpeech": "adjective",
+      "pronunciations": [
+        {
+          "type": "ipa",
+          "text": "/pəˈspɪkjuːəs/",
+          "tags": [
+            "Received Pronunciation"
+          ]
+        },
+        {
+          "type": "ipa",
+          "text": "/pərˈspɪkjəwəs/",
+          "tags": [
+            "General American"
+          ]
+        },
+        {
+          "type": "ipa",
+          "text": "/pɚˈspɪkjuːəs/",
+          "tags": [
+            "General American"
+          ]
+        }
+      ],
+      "forms": [
+        {
+          "word": "more perspicuous",
+          "tags": [
+            "comparative"
+          ]
+        },
+        {
+          "word": "most perspicuous",
+          "tags": [
+            "superlative"
+          ]
+        }
+      ],
+      "senses": [
+        {
+          "definition": "Clearly expressed, easy to understand; lucid.",
+          "tags": [],
+          "examples": [],
+          "quotes": [
+            {
+              "text": "I am always willing to run some hazard of being tedious in order to be sure that I am perspicuous […]",
+              "reference": "1776, Adam Smith, The Wealth of Nations, Book I, Chapter 4:"
+            }
+          ],
+          "synonyms": [
+            "transparent",
+            "pervious",
+            "apprehensible",
+            "clear",
+            "limpid",
+            "comprehensible",
+            "explainable",
+            "explicable",
+            "explicatable",
+            "fathomable",
+            "graspable",
+            "illuminable",
+            "intelligible",
+            "lucid",
+            "pellucid",
+            "perspicuous",
+            "straightforward",
+            "tangible",
+            "understandable"
+          ],
+          "antonyms": [
+            "abstruse",
+            "Chinese",
+            "dense",
+            "enigmatic",
+            "fathomless",
+            "Greek",
+            "inapprehensible",
+            "incognizable",
+            "incomprehensible",
+            "ineffable",
+            "inenubilable",
+            "inexplicable",
+            "impenetrable",
+            "insensible",
+            "inscrutable",
+            "insoluble",
+            "insolvable",
+            "mysterious",
+            "nonunderstandable",
+            "obscure",
+            "retruse",
+            "thick",
+            "undecipherable",
+            "undiscoverable",
+            "unexplainable",
+            "unfathomable",
+            "ungraspable",
+            "unintelligible",
+            "unknowable",
+            "ununderstandable"
+          ],
+          "translations": [
+            {
+              "language": {
+                "code": "bg",
+                "name": "Bulgarian"
+              },
+              "word": "ясен"
+            },
+            {
+              "language": {
+                "code": "bg",
+                "name": "Bulgarian"
+              },
+              "word": "прегледен"
+            },
+            {
+              "language": {
+                "code": "bg",
+                "name": "Bulgarian"
+              },
+              "word": "разбираем"
+            },
+            {
+              "language": {
+                "code": "cmn",
+                "name": "Chinese Mandarin"
+              },
+              "word": "明白"
+            },
+            {
+              "language": {
+                "code": "nl",
+                "name": "Dutch"
+              },
+              "word": "duidelijk"
+            },
+            {
+              "language": {
+                "code": "nl",
+                "name": "Dutch"
+              },
+              "word": "begrijpelijk"
+            },
+            {
+              "language": {
+                "code": "nl",
+                "name": "Dutch"
+              },
+              "word": "klaar"
+            },
+            {
+              "language": {
+                "code": "el",
+                "name": "Greek"
+              },
+              "word": "σαφής"
+            },
+            {
+              "language": {
+                "code": "ko",
+                "name": "Korean"
+              },
+              "word": "명백한"
+            },
+            {
+              "language": {
+                "code": "la",
+                "name": "Latin"
+              },
+              "word": "perspicuus"
+            },
+            {
+              "language": {
+                "code": "nb",
+                "name": "Norwegian Bokmål"
+              },
+              "word": "tydelig"
+            },
+            {
+              "language": {
+                "code": "ru",
+                "name": "Russian"
+              },
+              "word": "ясный"
+            },
+            {
+              "language": {
+                "code": "ru",
+                "name": "Russian"
+              },
+              "word": "понятный"
+            },
+            {
+              "language": {
+                "code": "ru",
+                "name": "Russian"
+              },
+              "word": "чёткий"
+            },
+            {
+              "language": {
+                "code": "es",
+                "name": "Spanish"
+              },
+              "word": "perspicuo"
+            }
+          ],
+          "subsenses": []
+        },
+        {
+          "definition": "(logic) (Of a language or notation) the process of inference from premises to conclusion is explicitly laid out.",
+          "tags": [],
+          "examples": [],
+          "quotes": [],
+          "synonyms": [],
+          "antonyms": [],
+          "translations": [],
+          "subsenses": []
+        },
+        {
+          "definition": "(literal, rare) That can be seen through clearly; that lets light through.",
+          "tags": [
+            "rare"
+          ],
+          "examples": [],
+          "quotes": [],
+          "synonyms": [
+            "transparent",
+            "see-through",
+            ";",
+            "translucent",
+            ";",
+            "clear",
+            "clear as crystal",
+            "crystalline",
+            "diaphanous",
+            "glassy",
+            "hyaline",
+            "hyaloid",
+            "limpid",
+            "lucid",
+            "pellucid",
+            "perspicuous",
+            "see-through",
+            "serene",
+            "transparent",
+            "transpicuous",
+            "vitreous"
+          ],
+          "antonyms": [
+            "imperspicuous",
+            "adiaphanous",
+            "nontransparent",
+            "opacous",
+            "opacular",
+            "opaque",
+            "thick"
+          ],
+          "translations": [],
+          "subsenses": []
+        }
+      ],
+      "synonyms": [],
+      "antonyms": []
+    }
+  ],
+  "source": {
+    "url": "https://en.wiktionary.org/wiki/perspicuous",
+    "license": {
+      "name": "CC BY-SA 4.0",
+      "url": "https://creativecommons.org/licenses/by-sa/4.0/"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# Ignore local environment files containing secrets
+.env.local
+.env
+
+# macOS
+.DS_Store
+
+# Node / common	node_modules/
