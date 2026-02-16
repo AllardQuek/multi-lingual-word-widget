@@ -77,6 +77,19 @@ This project includes three different script versions to suit different needs:
    - `USER_LANGUAGE_CODES`: languages to display (must match what your Elastic agent provides)
 4. Add widget
 
+#### Secure credentials in Scriptable (recommended)
+
+For Scriptable (iOS) store secrets in the system Keychain and read them at runtime.
+Run this once inside Scriptable to store values securely:
+
+```javascript
+Keychain.set("ELASTIC_API_URL", "https://your-elasticsearch-endpoint/...");
+Keychain.set("ELASTIC_API_KEY", "base64_api_key_here");
+Keychain.set("ELASTIC_TOOL_ID", "word.of.the.day.multilingual");
+```
+
+`script_elastic.js` reads from `Keychain` first, then falls back to `process.env` (for Node/CI) or `globalThis` if present. Keep `.env.local` gitignored and use `.env.example` as a template.
+
 **Common language codes:**
 - `"ar"` - Arabic, `"de"` - German, `"es"` - Spanish
 - `"fr"` - French, `"hi"` - Hindi, `"id"` - Indonesian

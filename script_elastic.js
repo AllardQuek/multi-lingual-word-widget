@@ -3,16 +3,31 @@
 
 // ========== USER CONFIGURATION ==========
 // Elastic API Configuration
-// Read from environment variables when available. Falls back to empty string
-// to avoid committing secrets in the repository. Fill .env.local with your
-// real values (not committed) and keep .env.example in the repo as a template.
-const ELASTIC_API_URL = (typeof process !== 'undefined' && process.env && process.env.ELASTIC_API_URL)
-  || (typeof globalThis !== 'undefined' && globalThis.ELASTIC_API_URL)
-  || "";
-const ELASTIC_API_KEY = (typeof process !== 'undefined' && process.env && process.env.ELASTIC_API_KEY)
-  || (typeof globalThis !== 'undefined' && globalThis.ELASTIC_API_KEY)
-  || "";
-const ELASTIC_TOOL_ID = "word.of.the.day.multilingual";
+// Helper to read environment values in Scriptable (Keychain) or Node (process.env)
+function getEnv(name) {
+  try {
+    if (typeof Keychain !== 'undefined' && Keychain.contains(name)) {
+      return Keychain.get(name);
+    }
+  } catch (e) {
+    // Keychain may not be defined outside Scriptable; ignore
+  }
+
+  if (typeof process !== 'undefined' && process.env && process.env[name]) {
+    return process.env[name];
+  }
+
+  if (typeof globalThis !== 'undefined' && globalThis[name]) {
+    return globalThis[name];
+  }
+
+  return "";
+}
+
+// Read configuration (preferred: Scriptable Keychain). See .env.example for placeholders.
+const ELASTIC_API_URL = getEnv("ELASTIC_API_URL");
+const ELASTIC_API_KEY = getEnv("ELASTIC_API_KEY");
+const ELASTIC_TOOL_ID = getEnv("ELASTIC_TOOL_ID") || "word.of.the.day.multilingual";
 
 // Customize which languages to display in the widget
 // Add the language codes for the languages you want to learn below
