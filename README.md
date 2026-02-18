@@ -90,6 +90,13 @@ Keychain.set("ELASTIC_TOOL_ID", "word.of.the.day.multilingual");
 
 `script_elastic.js` reads from `Keychain` first, then falls back to `process.env` (for Node/CI) or `globalThis` if present. Keep `.env.local` gitignored and use `.env.example` as a template.
 
+#### Widget refresh & caching (important)
+
+- Set the refresh hint in `script_elastic.js` by adjusting `REFRESH_INTERVAL_MINUTES` (default in this repo: 5). See [scripts/script_elastic.js](scripts/script_elastic.js#L46) for the constant. This value is a *hint* to iOS — the system may still delay actual refreshes to conserve battery.
+- The script sets `widget.refreshAfterDate` using that interval so iOS is told when the widget becomes stale. Without this hint iOS can cache the widget for many hours.
+- On transient errors the script requests an immediate retry by setting the error widget's `refreshAfterDate` to `new Date()` so iOS knows the content is already stale and should be refreshed as soon as it can.
+- If you see stale content while testing, manually run the script inside Scriptable or tap the widget to force an immediate refresh.
+
 **Common language codes:**
 - `"ar"` - Arabic, `"de"` - German, `"es"` - Spanish
 - `"fr"` - French, `"hi"` - Hindi, `"id"` - Indonesian

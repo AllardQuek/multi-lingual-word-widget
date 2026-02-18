@@ -42,6 +42,11 @@ const ELASTIC_TOOL_ID = getEnv("ELASTIC_TOOL_ID") || "word.of.the.day.multilingu
 //   "vi" - Vietnamese  "zh" - Chinese (Simplified)
 //
 const USER_LANGUAGE_CODES = ["de", "id", "vi", "km"];
+
+// How often the widget should request a refresh (in minutes).
+// iOS treats this as a *hint* — it may still delay the actual refresh,
+// but without this the system can cache the widget for many hours.
+const REFRESH_INTERVAL_MINUTES = 5;
 // ========================================
 
 // Build LANGS array from user configuration
@@ -75,11 +80,11 @@ async function fetchWordFromElastic() {
     console.log("Calling Elastic tool...");
     const response = await req.loadJSON();
     console.log(`Elastic response: ${JSON.stringify(response)}`);
-    
+
     if (!response) {
       throw new Error("Empty response from Elastic tool");
     }
-    
+
     return response;
   } catch (error) {
     console.error("Error calling Elastic tool:", error);
@@ -257,7 +262,10 @@ async function main() {
     
     // Create widget
     const widget = createWidget(data);
-    
+
+    // Tell iOS when to refresh — without this the widget can stay cached for hours
+    widget.refreshAfterDate = new Date(Date.now() + REFRESH_INTERVAL_MINUTES * 60 * 1000);
+
     if (config.runsInAccessoryWidget || config.runsInWidget) {
       Script.setWidget(widget);
     } else {
@@ -267,7 +275,10 @@ async function main() {
     console.error("Main error:", error);
     const errorMessage = error.message || "Failed to load word";
     const errorWidget = createErrorWidget(errorMessage, debugInfo);
-    
+
+    // On error, retry immediately so the widget recovers as soon as iOS allows
+    errorWidget.refreshAfterDate = new Date();
+
     if (config.runsInAccessoryWidget || config.runsInWidget) {
       Script.setWidget(errorWidget);
     } else {
