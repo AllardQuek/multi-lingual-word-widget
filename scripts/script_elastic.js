@@ -370,9 +370,26 @@ async function main() {
     const recent_objects = loadRecentObjects();
     const recent_words = recent_objects.map(o => o.id);
 
-    // Log path and full objects (include raw ts and a human-readable local time)
+    // Log path and full objects (include raw ts, ISO and a human-readable local time)
+    function fmtTimestamp(ts) {
+      const d = new Date(ts || 0);
+      let local;
+      try {
+        local = d.toLocaleString();
+      } catch (e) {
+        local = d.toString();
+      }
+      let iso;
+      try {
+        iso = d.toISOString();
+      } catch (e) {
+        iso = d.toString();
+      }
+      return { ts: Number(ts) || 0, local, iso };
+    }
+
     console.log('recentPath:', recentPath);
-    console.log('recent_objects:', recent_objects.map(o => ({ id: o.id, ts: o.ts, local: new Date(o.ts).toLocaleString() })));
+    console.log('recent_objects:', recent_objects.map(o => ({ id: o.id, ...fmtTimestamp(o.ts) })));
 
     // If running interactively in Scriptable (not as a widget), show the
     // recent file contents in QuickLook with local timestamps for easy inspection.
@@ -380,7 +397,7 @@ async function main() {
       try {
         if (typeof config !== 'undefined' && !config.runsInAccessoryWidget && !config.runsInWidget) {
           try {
-            const display = recent_objects.map(o => ({ id: o.id, ts: o.ts, local: new Date(o.ts).toLocaleString() }));
+            const display = recent_objects.map(o => ({ id: o.id, ...fmtTimestamp(o.ts) }));
             QuickLook.present(JSON.stringify(display, null, 2));
           } catch (e) {
             console.log('QuickLook.present failed:', e);
