@@ -90,12 +90,15 @@ Keychain.set("ELASTIC_TOOL_ID", "word.of.the.day.multilingual");
 
 `script_elastic.js` reads from `Keychain` first, then falls back to `process.env` (for Node/CI) or `globalThis` if present. Keep `.env.local` gitignored and use `.env.example` as a template.
 
-#### Widget refresh & caching (important)
+#### Local caching, deduplication and refresh (important)
 
-- Set the refresh hint in `script_elastic.js` by adjusting `REFRESH_INTERVAL_MINUTES` (default in this repo: 5). See [scripts/script_elastic.js](scripts/script_elastic.js#L46) for the constant. This value is a *hint* to iOS — the system may still delay actual refreshes to conserve battery.
-- The script sets `widget.refreshAfterDate` using that interval so iOS is told when the widget becomes stale. Without this hint iOS can cache the widget for many hours.
-- On transient errors the script requests an immediate retry by setting the error widget's `refreshAfterDate` to `new Date()` so iOS knows the content is already stale and should be refreshed as soon as it can.
-- If you see stale content while testing, manually run the script inside Scriptable or tap the widget to force an immediate refresh.
+- The Elastic version now uses a small local cache for per-device deduplication. The script stores the most-recent word ids in `recent_words.json` and passes that array to the Elastic tool as `tool_params.recent_words` so the agent can avoid recently-shown words.
+- Where the file is stored:
+   - Scriptable (iOS/iPadOS): Scriptable's Documents container → `recent_words.json` (the script writes to FileManager.documentsDirectory()). Use Scriptable's Files view or the Files app (On My iPhone/iPad → Scriptable → Documents) to open it.
+   - macOS / Node: when you run the script with Node, a fallback writes `recent_words.json` into the repository working directory (project root), so you can inspect it with `cat`/`jq` or a text editor.
+- How to change the recent-list size: edit the constant `RECENT_MAX` at the top of `scripts/script_elastic.js` (default: 3). The project intentionally uses a simple constant rather than runtime env/keychain configuration to keep behavior explicit and easy to edit.
+- The script shows QuickLook of the `recent_words` contents when run interactively inside Scriptable (useful during testing). For widget runs, check Scriptable logs; for Node runs, check terminal output.
+- Note about refresh hints: the iOS refresh hint (`widget.refreshAfterDate`) remains a best-effort hint to the system. The deduplication above ensures devices won't repeat recent words even if iOS delays refreshes. If you need global cross-device deduplication, integrate a server-side store (Redis/Upstash) or central backend.
 
 **Common language codes:**
 - `"ar"` - Arabic, `"de"` - German, `"es"` - Spanish
