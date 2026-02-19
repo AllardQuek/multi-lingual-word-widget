@@ -67,6 +67,8 @@ const RECENT_FILE = "recent_words.json";
 const isScriptable = (typeof FileManager !== 'undefined');
 const isNode = (typeof process !== 'undefined' && process.versions && process.versions.node);
 const fm = isScriptable ? FileManager.local() : null;
+console.log(fm.documentsDirectory());
+
 let recentPath = null;
 let nodeFs = null;
 let nodePathModule = null;
