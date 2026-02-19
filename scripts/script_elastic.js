@@ -64,6 +64,8 @@ const LANGS = [
 // (Simpler than using an environment/keychain value.)
 const RECENT_MAX = 0;
 const RECENT_FILE = "recent_words.json";
+// Time-to-live for recent entries (ms). Set to 3600000 for 1 hour. Set <=0 to disable expiry.
+const RECENT_TTL_MS = 5 * 60 * 1000;
 const isScriptable = (typeof FileManager !== 'undefined');
 const isNode = (typeof process !== 'undefined' && process.versions && process.versions.node);
 const fm = isScriptable ? FileManager.local() : null;
@@ -80,32 +82,63 @@ if (isScriptable) {
   recentPath = nodePathModule.join(process.cwd(), RECENT_FILE);
 }
 
-function loadRecent() {
+// Load recent entries as objects: [{id, ts}, ...]
+function loadRecentObjects() {
   try {
+    let raw = null;
     if (isScriptable) {
       if (!fm.fileExists(recentPath)) return [];
-      const s = fm.readString(recentPath);
-      const arr = JSON.parse(s);
-      if (Array.isArray(arr)) return arr;
+      raw = fm.readString(recentPath);
     } else if (isNode) {
       if (!nodeFs.existsSync(recentPath)) return [];
-      const s = nodeFs.readFileSync(recentPath, 'utf8');
-      const arr = JSON.parse(s);
-      if (Array.isArray(arr)) return arr;
+      raw = nodeFs.readFileSync(recentPath, 'utf8');
     }
+
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    let objs = [];
+
+    if (Array.isArray(parsed)) {
+      if (parsed.length === 0) return [];
+      // Two possible formats: legacy array of ids (strings) or array of {id, ts}
+      if (typeof parsed[0] === 'string') {
+        // Migrate legacy strings to objects with current timestamp
+        const now = Date.now();
+        objs = parsed.map(s => ({ id: s, ts: now }));
+      } else if (parsed[0] && typeof parsed[0] === 'object') {
+        // Ensure ts is numeric
+        objs = parsed.map(o => ({ id: o.id, ts: Number(o.ts) || 0 }));
+      }
+    }
+
+    // Apply TTL expiry if enabled
+    if (RECENT_TTL_MS > 0) {
+      const now = Date.now();
+      objs = objs.filter(o => (now - (o.ts || 0)) <= RECENT_TTL_MS);
+    }
+
+    // Persist cleaned list back to disk (self-healing/migration)
+    saveRecentObjects(objs);
+
+    return objs;
   } catch (e) {
     console.log('Failed to load recent words:', e);
+    return [];
   }
-  return [];
 }
 
-function saveRecent(list) {
+function loadRecent() {
+  return loadRecentObjects().map(o => o.id);
+}
+
+function saveRecentObjects(objs) {
   try {
+    const s = JSON.stringify(objs);
     if (isScriptable) {
       if (!fm) return;
-      fm.writeString(recentPath, JSON.stringify(list));
+      fm.writeString(recentPath, s);
     } else if (isNode) {
-      nodeFs.writeFileSync(recentPath, JSON.stringify(list), 'utf8');
+      nodeFs.writeFileSync(recentPath, s, 'utf8');
     }
   } catch (e) {
     console.log('Failed to save recent words:', e);
@@ -124,16 +157,18 @@ function deriveWordId(word) {
 }
 
 function pushRecentWordId(wordId) {
-  if (!wordId || !fm) return;
+  if (!wordId) return;
   wordId = wordId.toString();
-  let list = loadRecent();
-  list = list.filter(x => x !== wordId);
-  list.unshift(wordId);
-  // If RECENT_MAX <= 0 then keep unlimited history; otherwise trim to max
+  let objs = loadRecentObjects();
+  // Remove any existing entry for this id
+  objs = objs.filter(o => o.id !== wordId);
+  // Prepend new entry with timestamp
+  objs.unshift({ id: wordId, ts: Date.now() });
+  // Trim by RECENT_MAX if enabled (>0)
   if (RECENT_MAX > 0) {
-    list = list.slice(0, RECENT_MAX);
+    objs = objs.slice(0, RECENT_MAX);
   }
-  saveRecent(list);
+  saveRecentObjects(objs);
 }
 
 // Fetch word data from Elastic tool
@@ -336,20 +371,22 @@ async function main() {
   
   try {
     debugInfo = "Fetching data from Elastic tool...";
-    // Load recent words from local cache
-    const recent_words = loadRecent();
+    // Load recent entries (objects with timestamps)
+    const recent_objects = loadRecentObjects();
+    const recent_words = recent_objects.map(o => o.id);
 
-    // Not logging for some reason
+    // Log path and full objects (include raw ts and a human-readable local time)
     console.log('recentPath:', recentPath);
-    console.log('recent_words:', recent_words);
+    console.log('recent_objects:', recent_objects.map(o => ({ id: o.id, ts: o.ts, local: new Date(o.ts).toLocaleString() })));
 
     // If running interactively in Scriptable (not as a widget), show the
-    // recent file contents in QuickLook so it's easy to inspect.
+    // recent file contents in QuickLook with local timestamps for easy inspection.
     if (isScriptable) {
       try {
         if (typeof config !== 'undefined' && !config.runsInAccessoryWidget && !config.runsInWidget) {
           try {
-            QuickLook.present(JSON.stringify(recent_words, null, 2));
+            const display = recent_objects.map(o => ({ id: o.id, ts: o.ts, local: new Date(o.ts).toLocaleString() }));
+            QuickLook.present(JSON.stringify(display, null, 2));
           } catch (e) {
             console.log('QuickLook.present failed:', e);
           }
