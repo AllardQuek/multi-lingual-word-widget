@@ -66,6 +66,9 @@ const RECENT_MAX = 0;
 const RECENT_FILE = "recent_words.json";
 // Time-to-live for recent entries (ms). Set to 3600000 for 1 hour. Set <=0 to disable expiry.
 const RECENT_TTL_MS = 5 * 60 * 1000;
+// Toggle QuickLook display when running interactively in Scriptable.
+// Set to true to re-enable the QuickLook popup for inspection.
+const ENABLE_QUICKLOOK = false;
 const isScriptable = (typeof FileManager !== 'undefined');
 const isNode = (typeof process !== 'undefined' && process.versions && process.versions.node);
 const fm = isScriptable ? FileManager.local() : null;
@@ -398,9 +401,41 @@ async function main() {
         if (typeof config !== 'undefined' && !config.runsInAccessoryWidget && !config.runsInWidget) {
           try {
             const display = recent_objects.map(o => ({ id: o.id, ...fmtTimestamp(o.ts) }));
-            QuickLook.present(JSON.stringify(display, null, 2));
+            // Always log the readable display so macOS/Node users see it in console
+            if (Array.isArray(display) && display.length > 0) {
+              for (let i = 0; i < display.length; i++) {
+                const item = display[i] || {};
+                // Ensure we have a readable local timestamp; fall back to computing from ts
+                let localStr = item.local;
+                if (!localStr && item.ts) {
+                  try {
+                    localStr = new Date(Number(item.ts)).toLocaleString();
+                  } catch (e) {
+                    localStr = String(item.ts);
+                  }
+                }
+                try {
+                  console.log(`recent_display[${i}]: id=${item.id} time=${localStr} item=${JSON.stringify(item)}`);
+                } catch (e) {
+                  console.log(`recent_display[${i}]: id=${item.id} time=${localStr}`, item);
+                }
+              }
+            } else {
+              console.log('recent_display: []');
+            }
+            // In Scriptable interactive runs, present with QuickLook only if enabled
+            if (ENABLE_QUICKLOOK) {
+              try {
+                QuickLook.present(JSON.stringify(display, null, 2));
+              } catch (e) {
+                console.log('QuickLook.present failed:', e);
+              }
+            } else {
+              // QuickLook is disabled for less intrusive debugging; logs are above
+              // Console logs are visible in Scriptable's console without popups
+            }
           } catch (e) {
-            console.log('QuickLook.present failed:', e);
+            console.log('Scriptable debug display error:', e);
           }
         }
       } catch (e) {
