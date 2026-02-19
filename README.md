@@ -1,4 +1,4 @@
-# Multilingual Lock Screen Vocab Widget (Scriptable)
+# Multilingual Word Widget - Scriptable
 
 This project is a **personalizable vocabulary widget** for iOS and MacOS built with the [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) app. It shows a random word in **multiple languages** as a widget on your **home/lock screen**.
 
@@ -80,7 +80,7 @@ If you prefer a simpler local or public-API approach, two alternatives are avail
 ### Dynamic with Public APIs
 - Fetches random words from a public random word API
 - Translates words using a public translation API (LibreTranslate or similar)
-- BUT multi-lingual support is limited
+- BUT multilingual support is limited
 
 #### Usage
 1. Copy `scripts/script_api.js` to Scriptable
