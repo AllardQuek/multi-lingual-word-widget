@@ -24,10 +24,25 @@ function getEnv(name) {
   return "";
 }
 
-// Read configuration (preferred: Scriptable Keychain). See .env.example for placeholders.
+// ========== USER-FACING CONFIGURATION ==========
+// Keep common user-editable settings here for easier discovery.
+// - API keys / tool id are read via Keychain or environment using `getEnv()`.
+// - Tweak these to change local dedup behaviour and interactive debugging.
+
+// Elastic settings (read from Keychain/environment via `getEnv()`): See .env.example for placeholders.
 const ELASTIC_API_URL = getEnv("ELASTIC_API_URL");
 const ELASTIC_API_KEY = getEnv("ELASTIC_API_KEY");
 const ELASTIC_TOOL_ID = getEnv("ELASTIC_TOOL_ID") || "word.of.the.day.multilingual";
+
+// File name used to persist recent ids (Scriptable Documents or repo root)
+const RECENT_FILE = "recent_words.json";
+// Time-to-live for recent entries (ms). Set to 3600000 for 1 hour. Set <=0 to disable expiry.
+const RECENT_TTL_MS = 5 * 60 * 1000;
+
+// Possible alternative to TTL: Recent words cache size (0 = unbounded)
+const RECENT_MAX = 0;
+// Toggle QuickLook display when running interactively in Scriptable. May have issues on MacOS.
+const ENABLE_QUICKLOOK = false;
 
 // Customize which languages to display in the widget
 // Add the language codes for the languages you want to learn below
@@ -43,12 +58,7 @@ const ELASTIC_TOOL_ID = getEnv("ELASTIC_TOOL_ID") || "word.of.the.day.multilingu
 //
 const USER_LANGUAGE_CODES = ["de", "id", "vi", "km"];
 
-// NOT NEEDED FOR NOW
-// How often the widget should request a refresh (in minutes).
-// iOS treats this as a *hint* — it may still delay the actual refresh,
-// but without this the system can cache the widget for many hours.
-// const REFRESH_INTERVAL_MINUTES = 5;
-// ========================================
+// ================================================
 
 // Build LANGS array from user configuration
 const LANGS = [
@@ -59,16 +69,6 @@ const LANGS = [
   }))
 ];
 
-// Recent words cache (Scriptable FileManager)
-// Recent list size: default 3. Set this constant to change behavior.
-// (Simpler than using an environment/keychain value.)
-const RECENT_MAX = 0;
-const RECENT_FILE = "recent_words.json";
-// Time-to-live for recent entries (ms). Set to 3600000 for 1 hour. Set <=0 to disable expiry.
-const RECENT_TTL_MS = 5 * 60 * 1000;
-// Toggle QuickLook display when running interactively in Scriptable.
-// Set to true to re-enable the QuickLook popup for inspection.
-const ENABLE_QUICKLOOK = false;
 const isScriptable = (typeof FileManager !== 'undefined');
 const isNode = (typeof process !== 'undefined' && process.versions && process.versions.node);
 const fm = isScriptable ? FileManager.local() : null;
@@ -123,10 +123,6 @@ function loadRecentObjects() {
     console.log('Failed to load recent words:', e);
     return [];
   }
-}
-
-function loadRecent() {
-  return loadRecentObjects().map(o => o.id);
 }
 
 function saveRecentObjects(objs) {
@@ -461,10 +457,6 @@ async function main() {
     
     // Create widget
     const widget = createWidget(data);
-
-    // NOT NEEDED FOR NOW
-    // Tell iOS when to refresh — without this the widget can stay cached for hours
-    // widget.refreshAfterDate = new Date(Date.now() + REFRESH_INTERVAL_MINUTES * 60 * 1000);
 
     if (config.runsInAccessoryWidget || config.runsInWidget) {
       Script.setWidget(widget);

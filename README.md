@@ -70,43 +70,61 @@ This project includes three different script versions to suit different needs:
 
 1. Set up Elastic Agent Builder tool with your word generation workflow
 2. Copy `script_elastic.js` to Scriptable
-3. Configure at the top:
-   - `ELASTIC_API_URL`: your Elastic instance URL
-   - `ELASTIC_API_KEY`: your API key
-   - `ELASTIC_TOOL_ID`: your tool ID
-   - `USER_LANGUAGE_CODES`: languages to display (must match what your Elastic agent provides)
-4. Add widget
-
-#### Secure credentials in Scriptable (recommended)
-
-For Scriptable (iOS) store secrets in the system Keychain and read them at runtime.
-Run this once inside Scriptable to store values securely:
+3. Configure credentials (one-time — run inside Scriptable):
 
 ```javascript
+// One-time: run inside Scriptable to store keys in the system Keychain
 Keychain.set("ELASTIC_API_URL", "https://your-elasticsearch-endpoint/...");
 Keychain.set("ELASTIC_API_KEY", "base64_api_key_here");
 Keychain.set("ELASTIC_TOOL_ID", "word.of.the.day.multilingual");
 ```
 
+4. Add widget
+
 `script_elastic.js` reads from `Keychain` first, then falls back to `process.env` (for Node/CI) or `globalThis` if present. Keep `.env.local` gitignored and use `.env.example` as a template.
 
 #### Local caching, deduplication and refresh (important)
 
-- The Elastic version now uses a small local cache for per-device deduplication. The script stores the most-recent word ids in `recent_words.json` and passes that array to the Elastic tool as `tool_params.recent_words` so the agent can avoid recently-shown words.
-- Where the file is stored:
-   - Scriptable (iOS/iPadOS): Scriptable's Documents container → `recent_words.json` (the script writes to FileManager.documentsDirectory()). Use Scriptable's Files view or the Files app (On My iPhone/iPad → Scriptable → Documents) to open it.
-   - macOS / Node: when you run the script with Node, a fallback writes `recent_words.json` into the repository working directory (project root), so you can inspect it with `cat`/`jq` or a text editor.
-- How to change the recent-list size: edit the constant `RECENT_MAX` at the top of `scripts/script_elastic.js` (default: 3). The project intentionally uses a simple constant rather than runtime env/keychain configuration to keep behavior explicit and easy to edit.
-- The script shows QuickLook of the `recent_words` contents when run interactively inside Scriptable (useful during testing). For widget runs, check Scriptable logs; for Node runs, check terminal output.
-- Note about refresh hints: the iOS refresh hint (`widget.refreshAfterDate`) remains a best-effort hint to the system. The deduplication above ensures devices won't repeat recent words even if iOS delays refreshes. If you need global cross-device deduplication, integrate a server-side store (Redis/Upstash) or central backend.
+- The Elastic version maintains a small per-device recent-cache to avoid showing the same word repeatedly. The script persists this cache to `recent_words.json` as an array of objects with timestamps: `[ { "id": "...", "ts": 168... }, ... ]`. When calling the Elastic tool the script passes the ids as `tool_params.recent_words` so the agent can avoid recently-shown words.
 
-**Common language codes:**
-- `"ar"` - Arabic, `"de"` - German, `"es"` - Spanish
-- `"fr"` - French, `"hi"` - Hindi, `"id"` - Indonesian
-- `"it"` - Italian, `"ja"` - Japanese, `"ko"` - Korean
-- `"nl"` - Dutch, `"pl"` - Polish, `"pt"` - Portuguese
-- `"ru"` - Russian, `"th"` - Thai, `"tr"` - Turkish
-- `"vi"` - Vietnamese, `"zh"` - Chinese (Simplified)
+- Where the file is stored:
+   - Scriptable (iOS/iPadOS): Scriptable's Documents container → `recent_words.json` (the script writes to `FileManager.documentsDirectory()`). Inspect it via Scriptable's Files view or the Files app (On My iPhone/iPad → Scriptable → Documents).
+   - macOS / Node: when running with Node the script falls back to writing `recent_words.json` into the repository working directory (project root). Inspect it with `cat`, `jq`, or your editor.
+
+- TTL (expiry): each entry includes a `ts` timestamp (ms since epoch) and the script applies a lazy TTL on load. Configure the expiry duration with the `RECENT_TTL_MS` constant in `scripts/script_elastic.js` (milliseconds). Set `RECENT_TTL_MS <= 0` to disable expiry. Default in the script is 5 minutes.
+
+- Size limit: control how many recent ids are kept with `RECENT_MAX` (0 = unbounded). The default is `0` (no size limit); set it to a positive integer to cap stored entries.
+
+- QuickLook & logging: by default QuickLook popup is disabled to avoid intrusive popups during interactive runs. The script logs each recent entry as a separate console line including a readable local timestamp. Re-enable QuickLook by setting `ENABLE_QUICKLOOK = true` in the script.
+
+- Elastic tool id and credentials: the script reads `ELASTIC_API_URL` and `ELASTIC_API_KEY` from Scriptable Keychain (preferred) or environment variables. If `ELASTIC_TOOL_ID` is not provided, it falls back to the default tool id `word.of.the.day.multilingual`.
+
+- Note about refresh hints: the iOS refresh hint (`widget.refreshAfterDate`) remains a best-effort hint to the system. The per-device deduplication above helps avoid repeats even if iOS delays refreshes. For global deduplication across devices use a central store (Redis/Upstash) or server-side solution.
+
+**Currently Supported Language Codes:**
+1. `ar` - Arabic
+2. `yue` - Cantonese (Yue)
+3. `nl` - Dutch
+4. `fr` - French
+5. `de` - German
+6. `el` - Greek
+7. `he` - Hebrew
+8. `hi` - Hindi
+9. `id` - Indonesian
+10. `it` - Italian
+11. `ja` - Japanese
+12. `km` - Khmer
+13. `ko` - Korean
+14. `zh` - Mandarin / Chinese
+15. `pl` - Polish
+16. `pt` - Portuguese
+17. `ru` - Russian
+18. `es` - Spanish
+19. `sw` - Swahili
+20. `tl` - Tagalog
+21. `th` - Thai
+22. `tr` - Turkish
+23. `vi` - Vietnamese
 
 ---
 
