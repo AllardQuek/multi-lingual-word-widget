@@ -67,7 +67,7 @@ Keychain.set("ELASTIC_TOOL_ID", "word.of.the.day.multilingual");
 
 If you prefer a simpler local or public-API approach, two alternatives are available in the `scripts/` folder.
 
-### Static Vocabulary List 
+### 1. Static Vocabulary List 
 - Self-contained vocabulary entries defined in the script
 - No internet connection required
 - Perfect for curated or personal word lists
@@ -77,7 +77,7 @@ If you prefer a simpler local or public-API approach, two alternatives are avail
 1. Copy `scripts/script_static.js` to Scriptable
 1. Customize the `entries` array with your vocabulary and set `LANGS`
 
-### Dynamic with Public APIs
+### 2. Dynamic with Public APIs
 - Fetches random words from a public random word API
 - Translates words using a public translation API (LibreTranslate or similar)
 - BUT multilingual support is limited
