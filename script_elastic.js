@@ -44,29 +44,47 @@ const RECENT_MAX = 0;
 // Toggle QuickLook display when running interactively in Scriptable. May have issues on MacOS.
 const ENABLE_QUICKLOOK = false;
 
-// Customize which languages to display in the widget
-// Add the language codes for the languages you want to learn below
-// The Elastic agent determines which translations are available
-//
-// Common language codes:
-//   "ar" - Arabic      "de" - German       "es" - Spanish
-//   "fr" - French      "hi" - Hindi        "id" - Indonesian
-//   "it" - Italian     "ja" - Japanese     "ko" - Korean
-//   "nl" - Dutch       "pl" - Polish       "pt" - Portuguese
-//   "ru" - Russian     "th" - Thai         "tr" - Turkish
-//   "vi" - Vietnamese  "zh" - Chinese (Simplified)
-//
-const USER_LANGUAGE_CODES = ["de", "id", "vi", "km"];
+// Optional theme/topic for generation — edit the `THEME` variable below to customize.
+const THEME = "anything";
+
+// Language configuration: single list that contains each supported language,
+// its human-friendly name, and whether it should be included in translations.
+// Edit `include: true` to enable a language for translation/display.
+const LANG_CONFIG = [
+  { code: "de", name: "German", include: true },
+  { code: "id", name: "Indonesian", include: true },
+  { code: "km", name: "Khmer", include: true },
+  { code: "vi", name: "Vietnamese", include: true },
+  { code: "ar", name: "Arabic", include: false },
+  { code: "yue", name: "Cantonese", include: false },
+  { code: "nl", name: "Dutch", include: false },
+  { code: "fr", name: "French", include: false },
+  { code: "el", name: "Greek", include: false },
+  { code: "he", name: "Hebrew", include: false },
+  { code: "hi", name: "Hindi", include: false },
+  { code: "it", name: "Italian", include: false },
+  { code: "ja", name: "Japanese", include: false },
+  { code: "ko", name: "Korean", include: false },
+  { code: "zh", name: "Mandarin", include: false },
+  { code: "pl", name: "Polish", include: false },
+  { code: "pt", name: "Portuguese", include: false },
+  { code: "ru", name: "Russian", include: false },
+  { code: "es", name: "Spanish", include: false },
+  { code: "sw", name: "Swahili", include: false },
+  { code: "tl", name: "Tagalog", include: false },
+  { code: "th", name: "Thai", include: false },
+  { code: "tr", name: "Turkish", include: false }
+];
+
+// NOTE: change `include` booleans above to configure which languages are used.
+
 
 // ================================================
 
 // Build LANGS array from user configuration
 const LANGS = [
   { code: "en", label: "EN" },
-  ...USER_LANGUAGE_CODES.map(code => ({
-    code: code,
-    label: code.toUpperCase()
-  }))
+  ...LANG_CONFIG.filter(l => l.include).map(l => ({ code: l.code, label: l.code.toUpperCase() }))
 ];
 
 const isScriptable = (typeof FileManager !== 'undefined');
@@ -166,7 +184,7 @@ function pushRecentWordId(wordId) {
 }
 
 // Fetch word data from Elastic tool
-async function fetchWordFromElastic(recentWords = []) {
+async function fetchWordFromElastic(recentWords = [], languageCodes = [], theme = "anything") {
   try {
     if (!ELASTIC_API_URL || !ELASTIC_API_KEY) {
       throw new Error("Missing Elastic API configuration. Set ELASTIC_API_URL and ELASTIC_API_KEY in your environment (see .env.example)");
@@ -182,9 +200,13 @@ async function fetchWordFromElastic(recentWords = []) {
     req.body = JSON.stringify({
       tool_id: ELASTIC_TOOL_ID,
       tool_params: {
-        recent_words: recentWords
+        recent_words: recentWords,
+        language_codes: languageCodes,
+        theme: theme
       }
     });
+    console.log('Sending language_codes:', JSON.stringify(languageCodes));
+    console.log('Sending theme:', theme);
     
     console.log("Calling Elastic tool...");
     const response = await req.loadJSON();
@@ -439,8 +461,14 @@ async function main() {
       }
     }
 
-    // Fetch word data from Elastic (pass recent_words so the agent can avoid them)
-    const elasticResponse = await fetchWordFromElastic(recent_words);
+    // Build language_codes param in the format: "Name (code)" from LANG_CONFIG
+    const selectedLangs = LANG_CONFIG.filter(l => l.include);
+    const language_codes_param = (selectedLangs.length > 0)
+      ? selectedLangs.map(l => `${l.name} (${l.code})`)
+      : LANG_CONFIG.map(l => `${l.name} (${l.code})`);
+
+    // Fetch word data from Elastic (pass recent_words, language_codes and theme so the agent can avoid recent words and constrain by theme)
+    const elasticResponse = await fetchWordFromElastic(recent_words, language_codes_param, THEME);
     
     // Transform response to widget data format
     const data = transformElasticResponse(elasticResponse);

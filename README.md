@@ -1,35 +1,40 @@
 # Multilingual Lock Screen Vocab Widget (Scriptable)
 
-This project is a **personalizable vocabulary widget** for iOS built with the [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) app. It shows one random concept in **multiple languages** directly on your **lock screen**.
+This project is a **personalizable vocabulary widget** for iOS and MacOS built with the [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) app. It shows a random word in **multiple languages** as a widget on your **home/lock screen**.
 
 The focus is on **daily passive exposure** to vocabulary across several languages at once.
 
 ---
 
-## Available Versions
+## Main Version — Elastic (recommended)
 
-This project includes three different script versions to suit different needs:
+The preferred and primary integration is the Elastic Agent Builder-based script. It provides centralized, high-quality word generation and translation with a single call to your Elastic agent, and includes local caching/deduplication to avoid repeats.
 
-### 1. **script_static.js** - Static Vocabulary List
+### script_elastic.js — Elastic Agent Builder (recommended)
+- Uses Elastic Agent Builder for both word generation and translations
+- Single API call replaces separate fetch + translate steps
+- Centralized configuration via your Elastic agent/tool
+- Includes per-device recent-cache, TTL and size controls
+- Best choice for production use and centralized control
+
+---
+
+## Alternatives
+
+If you prefer a simpler local or public-API approach, two alternatives are available in the `scripts/` folder.
+
+### scripts/script_static.js — Static Vocabulary List
 - Self-contained vocabulary entries defined in the script
 - No internet connection required
-- Perfect for curated word lists
+- Perfect for curated or personal word lists
 - Easy to customize and add your own words
-- Supports any languages you define
 
-### 2. **script_api.js** - Dynamic with Public APIs
+### scripts/script_api.js — Dynamic with Public APIs
 - Fetches random words from a public random word API
-- Translates words using LibreTranslate API
+- Translates words using a public translation API (LibreTranslate or similar)
 - Gets fresh vocabulary automatically
 - Requires internet connection
-- Configure difficulty level and number of words
-
-### 3. **script_elastic.js** - Elastic Agent Builder Integration
-- Uses Elastic Agent Builder tool for word generation and translations
-- Single API call replaces both word fetching and translation
-- Centralized configuration in your Elastic agent
-- Requires Elastic Cloud setup with Agent Builder
-- Supports any languages configured in your Elastic tool
+- Easy to run without Elastic infrastructure
 
 ---
 
@@ -44,32 +49,22 @@ This project includes three different script versions to suit different needs:
 - **Language-agnostic design**:
   - Easy to customize which languages to display
   - Simple configuration via language code array
+**Customization**
+- **Languages:** Edit the `LANG_CONFIG` array in `script_elastic.js` to enable languages for translation and display. Each entry is an object with `code`, `name` and `include` (set `include: true` to use a language).
+- **Theme/topic:** Edit the `THEME` variable in `script_elastic.js` to constrain generation (default: "anything").
+- **Deduplication:** Adjust `RECENT_TTL_MS` and `RECENT_MAX` in `script_elastic.js` to control how recently-seen words are filtered.
 
 ---
 
 ## Quick Start
 
-### Using Static Version (script_static.js)
 
-1. Open Scriptable app on iOS
-2. Create a new script and paste the contents of `script_static.js`
-3. Customize the `entries` array with your vocabulary
-4. Configure `USER_LANGUAGE_CODES` with desired languages
-5. Add widget to your lock screen or home screen
+### Quick Start
 
-### Using API Version (script_api.js)
-
-1. Copy `script_api.js` to Scriptable
-2. Configure at the top:
-   - `USER_LANGUAGE_CODES`: languages you want to learn
-   - `WORDS_TO_FETCH`: how many words to fetch
-   - Optionally adjust difficulty level
-3. Add widget (requires internet connection)
-
-### Using Elastic Version (script_elastic.js)
+#### Elastic (recommended)
 
 1. Set up Elastic Agent Builder tool with your word generation workflow
-2. Copy `script_elastic.js` to Scriptable
+2. Copy `script_elastic.js` (root of repo) to Scriptable
 3. Configure credentials (one-time — run inside Scriptable):
 
 ```javascript
@@ -81,7 +76,22 @@ Keychain.set("ELASTIC_TOOL_ID", "word.of.the.day.multilingual");
 
 4. Add widget
 
-`script_elastic.js` reads from `Keychain` first, then falls back to `process.env` (for Node/CI) or `globalThis` if present. Keep `.env.local` gitignored and use `.env.example` as a template.
+`script_elastic.js` reads from Scriptable Keychain first, then falls back to environment variables when run in Node/CI. Keep local env secrets out of git and use `.env.example` as a template.
+
+#### Alternatives — Static and API
+
+Using the static or API versions is simpler and works without Elastic. They are available in the `scripts/` folder.
+
+Static:
+1. Open Scriptable app on iOS
+2. Create a new script and paste the contents of `scripts/script_static.js`
+3. Customize the `entries` array with your vocabulary and set `USER_LANGUAGE_CODES`
+4. Add widget to your lock or home screen
+
+API:
+1. Copy `scripts/script_api.js` to Scriptable
+2. Configure the top-level constants (`USER_LANGUAGE_CODES`, `WORDS_TO_FETCH`, etc.)
+3. Add widget (requires internet connection)
 
 #### Local caching, deduplication and refresh (important)
 
@@ -91,7 +101,7 @@ Keychain.set("ELASTIC_TOOL_ID", "word.of.the.day.multilingual");
    - Scriptable (iOS/iPadOS): Scriptable's Documents container → `recent_words.json` (the script writes to `FileManager.documentsDirectory()`). Inspect it via Scriptable's Files view or the Files app (On My iPhone/iPad → Scriptable → Documents).
    - macOS / Node: when running with Node the script falls back to writing `recent_words.json` into the repository working directory (project root). Inspect it with `cat`, `jq`, or your editor.
 
-- TTL (expiry): each entry includes a `ts` timestamp (ms since epoch) and the script applies a lazy TTL on load. Configure the expiry duration with the `RECENT_TTL_MS` constant in `scripts/script_elastic.js` (milliseconds). Set `RECENT_TTL_MS <= 0` to disable expiry. Default in the script is 5 minutes.
+-- TTL (expiry): each entry includes a `ts` timestamp (ms since epoch) and the script applies a lazy TTL on load. Configure the expiry duration with the `RECENT_TTL_MS` constant in `script_elastic.js` (root of repository) (milliseconds). Set `RECENT_TTL_MS <= 0` to disable expiry. Default in the script is 5 minutes.
 
 - Size limit: control how many recent ids are kept with `RECENT_MAX` (0 = unbounded). The default is `0` (no size limit); set it to a positive integer to cap stored entries.
 

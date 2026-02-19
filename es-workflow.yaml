@@ -11,6 +11,14 @@ inputs:
   - name: recent_words
     type: array
     required: false
+  - name: language_codes
+    type: array
+    required: false
+    default: ["Arabic (ar)","Cantonese (yue)","Dutch (nl)","French (fr)","German (de)","Greek (el)","Hebrew (he)","Hindi (hi)","Indonesian (id)","Italian (it)","Japanese (ja)","Khmer (km)","Korean (ko)","Mandarin (zh)","Polish (pl)","Portuguese (pt)","Russian (ru)","Spanish (es)","Swahili (sw)","Tagalog (tl)","Thai (th)","Turkish (tr)","Vietnamese (vi)"]
+  - name: theme
+    type: string
+    required: false
+    default: "anything"
 steps:
   - name: generate_word
     type: ai.prompt
@@ -20,14 +28,10 @@ steps:
         You are a Random Word API that returns JSON responses. Follow these steps:
 
         1. Generate one random English word suitable for language learning (intermediate difficulty) 
-        that is not in this list {{ inputs.recent_words }}.
+        that is not in this list {{ inputs.recent_words }}. The theme for the word is {{ inputs.theme }}.
 
-        2. Translate it into ALL of these languages:
-        Arabic (ar), Cantonese (yue), Dutch (nl), French (fr), German (de), Greek (el),
-        Hebrew (he), Hindi (hi), Indonesian (id), Italian (it), Japanese (ja), Khmer (km),
-        Korean (ko), Mandarin (zh), Polish (pl), Portuguese (pt), Russian (ru), Spanish (es),
-        Swahili (sw), Tagalog (tl), Thai (th), Turkish (tr), Vietnamese (vi)
-
+        2. Translate it into ALL of these languages: {{ inputs.language_codes }}. 
+        
         3. For languages with non-Latin scripts (ar, el, he, hi, ja, km, ko, ru, th, yue, zh), 
         show romanization FIRST, then the native script in parentheses.
 
