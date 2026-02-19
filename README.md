@@ -7,12 +7,12 @@ The focus is on **daily passive exposure** to vocabulary across several language
 <table>
    <tr>
       <td align="center">
-         <img src="docs/images/home-screen.jpg" alt="Home Screen" width="320" height="220" style="object-fit:contain;" />
+         <img src="docs/images/home-screen.jpg" alt="Home Screen" width="320" style="object-fit:contain;" />
          <br/>
          <strong>Home Screen (iOS)</strong>
       </td>
       <td align="center">
-         <img src="docs/images/lock-screen.jpg" alt="Lock Screen" width="320" height="220" style="object-fit:contain;" />
+         <img src="docs/images/lock-screen.jpg" alt="Lock Screen" width="320" style="object-fit:contain;" />
          <br/>
          <strong>Lock Screen (iOS)</strong>
       </td>
