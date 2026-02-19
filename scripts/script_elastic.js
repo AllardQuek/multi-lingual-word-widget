@@ -43,10 +43,11 @@ const ELASTIC_TOOL_ID = getEnv("ELASTIC_TOOL_ID") || "word.of.the.day.multilingu
 //
 const USER_LANGUAGE_CODES = ["de", "id", "vi", "km"];
 
+// NOT NEEDED FOR NOW
 // How often the widget should request a refresh (in minutes).
 // iOS treats this as a *hint* — it may still delay the actual refresh,
 // but without this the system can cache the widget for many hours.
-const REFRESH_INTERVAL_MINUTES = 5;
+// const REFRESH_INTERVAL_MINUTES = 5;
 // ========================================
 
 // Build LANGS array from user configuration
@@ -58,8 +59,83 @@ const LANGS = [
   }))
 ];
 
+// Recent words cache (Scriptable FileManager)
+// Recent list size: default 3. Set this constant to change behavior.
+// (Simpler than using an environment/keychain value.)
+const RECENT_MAX = 0;
+const RECENT_FILE = "recent_words.json";
+const isScriptable = (typeof FileManager !== 'undefined');
+const isNode = (typeof process !== 'undefined' && process.versions && process.versions.node);
+const fm = isScriptable ? FileManager.local() : null;
+let recentPath = null;
+let nodeFs = null;
+let nodePathModule = null;
+if (isScriptable) {
+  recentPath = fm.joinPath(fm.documentsDirectory(), RECENT_FILE);
+} else if (isNode) {
+  nodeFs = require('fs');
+  nodePathModule = require('path');
+  recentPath = nodePathModule.join(process.cwd(), RECENT_FILE);
+}
+
+function loadRecent() {
+  try {
+    if (isScriptable) {
+      if (!fm.fileExists(recentPath)) return [];
+      const s = fm.readString(recentPath);
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr)) return arr;
+    } else if (isNode) {
+      if (!nodeFs.existsSync(recentPath)) return [];
+      const s = nodeFs.readFileSync(recentPath, 'utf8');
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr)) return arr;
+    }
+  } catch (e) {
+    console.log('Failed to load recent words:', e);
+  }
+  return [];
+}
+
+function saveRecent(list) {
+  try {
+    if (isScriptable) {
+      if (!fm) return;
+      fm.writeString(recentPath, JSON.stringify(list));
+    } else if (isNode) {
+      nodeFs.writeFileSync(recentPath, JSON.stringify(list), 'utf8');
+    }
+  } catch (e) {
+    console.log('Failed to save recent words:', e);
+  }
+}
+
+// Simple id decision:
+// - We keep this intentionally minimal: derive a small identifier used only
+//   for local deduplication by lowercasing and trimming the word. We opted
+//   not to perform aggressive normalization (diacritics/punctuation) because
+//   the LLM is unlikely to return minor spelling variants and we preserve
+//   the original `word` for display.
+function deriveWordId(word) {
+  if (!word) return "";
+  return word.toString().trim().toLowerCase();
+}
+
+function pushRecentWordId(wordId) {
+  if (!wordId || !fm) return;
+  wordId = wordId.toString();
+  let list = loadRecent();
+  list = list.filter(x => x !== wordId);
+  list.unshift(wordId);
+  // If RECENT_MAX <= 0 then keep unlimited history; otherwise trim to max
+  if (RECENT_MAX > 0) {
+    list = list.slice(0, RECENT_MAX);
+  }
+  saveRecent(list);
+}
+
 // Fetch word data from Elastic tool
-async function fetchWordFromElastic() {
+async function fetchWordFromElastic(recentWords = []) {
   try {
     if (!ELASTIC_API_URL || !ELASTIC_API_KEY) {
       throw new Error("Missing Elastic API configuration. Set ELASTIC_API_URL and ELASTIC_API_KEY in your environment (see .env.example)");
@@ -74,7 +150,9 @@ async function fetchWordFromElastic() {
     };
     req.body = JSON.stringify({
       tool_id: ELASTIC_TOOL_ID,
-      tool_params: {}
+      tool_params: {
+        recent_words: recentWords
+      }
     });
     
     console.log("Calling Elastic tool...");
@@ -95,6 +173,7 @@ async function fetchWordFromElastic() {
 // Transform Elastic response to widget data format
 function transformElasticResponse(elasticResponse) {
   const data = {
+    id: null,
     word: "",
     concept: "No definition available",
     difficulty: "",
@@ -138,6 +217,13 @@ function transformElasticResponse(elasticResponse) {
     if (parsedOutput.word) {
       data.word = parsedOutput.word;
       data.translations.en = parsedOutput.word;
+    }
+
+    // Extract id if provided, otherwise derive from word
+    if (parsedOutput.id) {
+      data.id = parsedOutput.id.toString();
+    } else if (data.word) {
+      data.id = deriveWordId(data.word);
     }
     
     // Extract definition
@@ -248,9 +334,31 @@ async function main() {
   
   try {
     debugInfo = "Fetching data from Elastic tool...";
-    
-    // Fetch word data from Elastic
-    const elasticResponse = await fetchWordFromElastic();
+    // Load recent words from local cache
+    const recent_words = loadRecent();
+
+    // Not logging for some reason
+    console.log('recentPath:', recentPath);
+    console.log('recent_words:', recent_words);
+
+    // If running interactively in Scriptable (not as a widget), show the
+    // recent file contents in QuickLook so it's easy to inspect.
+    if (isScriptable) {
+      try {
+        if (typeof config !== 'undefined' && !config.runsInAccessoryWidget && !config.runsInWidget) {
+          try {
+            QuickLook.present(JSON.stringify(recent_words, null, 2));
+          } catch (e) {
+            console.log('QuickLook.present failed:', e);
+          }
+        }
+      } catch (e) {
+        console.log('Scriptable debug display error:', e);
+      }
+    }
+
+    // Fetch word data from Elastic (pass recent_words so the agent can avoid them)
+    const elasticResponse = await fetchWordFromElastic(recent_words);
     
     // Transform response to widget data format
     const data = transformElasticResponse(elasticResponse);
@@ -260,11 +368,17 @@ async function main() {
       throw new Error("No word data received from Elastic tool");
     }
     
+    // Save chosen id to recent cache so next runs exclude it
+    if (data.id) {
+      pushRecentWordId(data.id);
+    }
+    
     // Create widget
     const widget = createWidget(data);
 
+    // NOT NEEDED FOR NOW
     // Tell iOS when to refresh — without this the widget can stay cached for hours
-    widget.refreshAfterDate = new Date(Date.now() + REFRESH_INTERVAL_MINUTES * 60 * 1000);
+    // widget.refreshAfterDate = new Date(Date.now() + REFRESH_INTERVAL_MINUTES * 60 * 1000);
 
     if (config.runsInAccessoryWidget || config.runsInWidget) {
       Script.setWidget(widget);

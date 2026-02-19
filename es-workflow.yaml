@@ -1,5 +1,5 @@
-name: word-of-the-day-api
-description: Generate a random word with translations in 23 languages for iPhone widget
+name: rotating-word-api
+description: Generate a rotating random word with translations in 23 languages for iPhone widget
 enabled: true
 tags:
   - api
@@ -7,26 +7,33 @@ tags:
   - llm
 triggers:
   - type: manual
+inputs: 
+  - name: recent_words
+    type: array
+    required: false
 steps:
   - name: generate_word
     type: ai.prompt
     with:
-      temperature: 0.9
+      temperature: 1
       prompt: |
-        You are a Word of the Day API that returns JSON responses.
+        You are a Random Word API that returns JSON responses. Follow these steps:
 
-        Generate one random English word suitable for language learning (intermediate difficulty).
+        1. Generate one random English word suitable for language learning (intermediate difficulty) 
+        that is not in this list {{ inputs.recent_words }}.
 
-        Translate it into ALL of these languages:
+        2. Translate it into ALL of these languages:
         Arabic (ar), Cantonese (yue), Dutch (nl), French (fr), German (de), Greek (el),
         Hebrew (he), Hindi (hi), Indonesian (id), Italian (it), Japanese (ja), Khmer (km),
         Korean (ko), Mandarin (zh), Polish (pl), Portuguese (pt), Russian (ru), Spanish (es),
         Swahili (sw), Tagalog (tl), Thai (th), Turkish (tr), Vietnamese (vi)
 
-        For languages with non-Latin scripts (ar, el, he, hi, ja, km, ko, ru, th, yue, zh), 
+        3. For languages with non-Latin scripts (ar, el, he, hi, ja, km, ko, ru, th, yue, zh), 
         show romanization FIRST, then the native script in parentheses.
 
-        Return ONLY valid JSON with translations sorted alphabetically by language code:
+        4. Return ONLY valid JSON with translations sorted alphabetically by language code.
+
+        Example response (fields and order are illustrative):
         {
           "word": "the word",
           "definition": "brief definition (max 50 chars)",
@@ -62,15 +69,6 @@ steps:
         - Just raw JSON
         - Keep definition under 50 characters
         - For non-Latin scripts: romanization FIRST, then native script in parentheses
-        - Sort translations alphabetically by language code
-          }
-        }
-
-        Rules:
-        - No markdown, no code blocks, no explanations
-        - Just raw JSON
-        - Keep definition under 50 characters
-        - Always include romanization for non-Latin scripts in parentheses
         - Sort translations alphabetically by language code
   - name: log_response
     type: console
