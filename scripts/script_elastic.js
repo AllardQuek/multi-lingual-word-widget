@@ -100,15 +100,10 @@ function loadRecentObjects() {
 
     if (Array.isArray(parsed)) {
       if (parsed.length === 0) return [];
-      // Two possible formats: legacy array of ids (strings) or array of {id, ts}
-      if (typeof parsed[0] === 'string') {
-        // Migrate legacy strings to objects with current timestamp
-        const now = Date.now();
-        objs = parsed.map(s => ({ id: s, ts: now }));
-      } else if (parsed[0] && typeof parsed[0] === 'object') {
-        // Ensure ts is numeric
-        objs = parsed.map(o => ({ id: o.id, ts: Number(o.ts) || 0 }));
-      }
+      // Expect array of {id, ts} objects. Ignore any other formats.
+      objs = parsed
+        .filter(o => o && typeof o === 'object' && o.id)
+        .map(o => ({ id: o.id, ts: Number(o.ts) || 0 }));
     }
 
     // Apply TTL expiry if enabled
