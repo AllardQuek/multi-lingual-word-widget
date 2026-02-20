@@ -4,6 +4,8 @@ This project is a **personalizable vocabulary widget** for iOS and MacOS built w
 
 The focus is on **daily passive exposure** to vocabulary across several languages at once.
 
+Read about the journey on [Substack](https://allardqjy.substack.com/p/nano-learning-for-polyglots-with?r=6xcuuz) or [Medium](https://medium.com/@allardqjy/413fd19a2f59).
+
 <table>
    <tr>
       <td align="center">
