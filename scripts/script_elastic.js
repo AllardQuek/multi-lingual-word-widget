@@ -103,7 +103,7 @@ if (isScriptable) {
   recentPath = nodePathModule.join(process.cwd(), RECENT_FILE);
 }
 
-// Load recent entries as objects: [{id, ts}, ...]
+// Load recent entries as objects: [{id, ts, word, definition, translations}, ...]
 function loadRecentObjects() {
   try {
     let raw = null;
@@ -121,10 +121,17 @@ function loadRecentObjects() {
 
     if (Array.isArray(parsed)) {
       if (parsed.length === 0) return [];
-      // Expect array of {id, ts} objects. Ignore any other formats.
+      // Expect array of {id, ts, word, definition, translations} objects.
+      // Filter out old-format entries (without word field) for auto-migration.
       objs = parsed
-        .filter(o => o && typeof o === 'object' && o.id)
-        .map(o => ({ id: o.id, ts: Number(o.ts) || 0 }));
+        .filter(o => o && typeof o === 'object' && o.id && o.word)
+        .map(o => ({
+          id: o.id,
+          ts: Number(o.ts) || 0,
+          word: o.word,
+          definition: o.definition,
+          translations: o.translations
+        }));
     }
 
     // Apply TTL expiry if enabled
@@ -168,19 +175,71 @@ function deriveWordId(word) {
   return word.toString().trim().toLowerCase();
 }
 
-function pushRecentWordId(wordId) {
+function pushRecentWordId(wordData) {
+  if (!wordData || !wordData.word) return;
+  const wordId = deriveWordId(wordData.word);
   if (!wordId) return;
-  wordId = wordId.toString();
+  
   let objs = loadRecentObjects();
   // Remove any existing entry for this id
   objs = objs.filter(o => o.id !== wordId);
-  // Prepend new entry with timestamp
-  objs.unshift({ id: wordId, ts: Date.now() });
+  // Prepend new entry with timestamp and full data
+  objs.unshift({
+    id: wordId,
+    ts: Date.now(),
+    word: wordData.word,
+    definition: wordData.definition,
+    translations: wordData.translations
+  });
   // Trim by RECENT_MAX if enabled (>0)
   if (RECENT_MAX > 0) {
     objs = objs.slice(0, RECENT_MAX);
   }
   saveRecentObjects(objs);
+}
+
+// Select random fallback from cache for offline display
+function selectRandomFallback() {
+  try {
+    const objs = loadRecentObjects();
+    // Filter for entries with complete data
+    const validEntries = objs.filter(o => 
+      o.word && o.definition && o.translations && typeof o.translations === 'object'
+    );
+    
+    if (validEntries.length === 0) return null;
+    
+    // Select random entry
+    const randomIndex = Math.floor(Math.random() * validEntries.length);
+    const entry = validEntries[randomIndex];
+    
+    // Calculate cache age
+    const cacheAge = Date.now() - (entry.ts || 0);
+    
+    return {
+      word: entry.word,
+      definition: entry.definition,
+      translations: entry.translations,
+      cacheAge: cacheAge,
+      id: entry.id
+    };
+  } catch (e) {
+    console.log('Failed to select random fallback:', e);
+    return null;
+  }
+}
+
+// Format cache age for display (e.g., "5m", "2h", "1d")
+function formatCacheAge(ageMs) {
+  const seconds = Math.floor(ageMs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) return `${days}d`;
+  if (hours > 0) return `${hours}h`;
+  if (minutes > 0) return `${minutes}m`;
+  return "<1m";
 }
 
 // Fetch word data from Elastic tool
@@ -349,7 +408,7 @@ function addLangRow(lang, value, widget, fontSize) {
 }
 
 // Create widget with data
-function createWidget(data) {
+function createWidget(data, metadata = null) {
   let widget = new ListWidget();
   widget.backgroundColor = new Color("#111827");
   const fam = config.widgetFamily;
@@ -358,11 +417,29 @@ function createWidget(data) {
     widget.setPadding(4, 8, 4, 8);
     const rowFontSize = 13;
     
+    // Show offline indicator if cached
+    if (metadata && metadata.isOffline) {
+      let offlineText = widget.addText(`📡 Offline - cached ${formatCacheAge(metadata.cacheAge)} ago`);
+      offlineText.font = Font.systemFont(10);
+      offlineText.textColor = new Color("#9CA3AF");
+      offlineText.lineLimit = 1;
+      widget.addSpacer(2);
+    }
+    
     for (const lang of LANGS) {
       addLangRow(lang, data.translations[lang.code], widget, rowFontSize);
     }
   } else {
     widget.setPadding(6, 10, 6, 10);
+
+    // Show offline indicator if cached
+    if (metadata && metadata.isOffline) {
+      let offlineText = widget.addText(`📡 Offline - cached ${formatCacheAge(metadata.cacheAge)} ago`);
+      offlineText.font = Font.systemFont(11);
+      offlineText.textColor = new Color("#9CA3AF");
+      offlineText.lineLimit = 1;
+      widget.addSpacer(3);
+    }
 
     let conceptText = widget.addText(data.concept);
     conceptText.font = Font.systemFont(14);
@@ -478,10 +555,8 @@ async function main() {
       throw new Error("No word data received from Elastic tool");
     }
     
-    // Save chosen id to recent cache so next runs exclude it
-    if (data.id) {
-      pushRecentWordId(data.id);
-    }
+    // Save full word data to recent cache (for deduplication and offline fallback)
+    pushRecentWordId(data);
     
     // Create widget
     const widget = createWidget(data);
@@ -493,16 +568,61 @@ async function main() {
     }
   } catch (error) {
     console.error("Main error:", error);
-    const errorMessage = error.message || "Failed to load word";
-    const errorWidget = createErrorWidget(errorMessage, debugInfo);
-
-    // On error, retry immediately so the widget recovers as soon as iOS allows
-    errorWidget.refreshAfterDate = new Date();
-
-    if (config.runsInAccessoryWidget || config.runsInWidget) {
-      Script.setWidget(errorWidget);
+    
+    // Try to show cached fallback instead of error widget
+    const fallback = selectRandomFallback();
+    
+    if (fallback) {
+      console.log('Using cached fallback word:', fallback.word);
+      // Transform fallback to widget data format
+      const fallbackData = {
+        word: fallback.word,
+        concept: fallback.definition || fallback.word,
+        definition: fallback.definition,
+        translations: fallback.translations,
+        id: fallback.id
+      };
+      
+      const widget = createWidget(fallbackData, {
+        isOffline: true,
+        cacheAge: fallback.cacheAge
+      });
+      
+      // Still retry on next refresh
+      widget.refreshAfterDate = new Date();
+      
+      if (config.runsInAccessoryWidget || config.runsInWidget) {
+        Script.setWidget(widget);
+      } else {
+        await widget.presentSmall();
+      }
     } else {
-      await errorWidget.presentSmall();
+      // No cached fallback available, show user-friendly error message
+      console.log('No cached fallback available, showing error');
+      
+      // Provide user-friendly error message based on context
+      let userMessage = "Unable to connect";
+      let userDetails = "Check your internet connection and try again";
+      
+      // Check if it's a configuration issue
+      if (!ELASTIC_API_URL || !ELASTIC_API_KEY) {
+        userMessage = "Configuration needed";
+        userDetails = "Set up API credentials in Keychain";
+      } else if (error.message && error.message.includes("Missing Elastic API configuration")) {
+        userMessage = "Configuration needed";
+        userDetails = "Set up API credentials in Keychain";
+      }
+      
+      const errorWidget = createErrorWidget(userMessage, userDetails);
+
+      // On error, retry immediately so the widget recovers as soon as iOS allows
+      errorWidget.refreshAfterDate = new Date();
+
+      if (config.runsInAccessoryWidget || config.runsInWidget) {
+        Script.setWidget(errorWidget);
+      } else {
+        await errorWidget.presentSmall();
+      }
     }
   }
   
