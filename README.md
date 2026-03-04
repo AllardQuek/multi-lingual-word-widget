@@ -30,42 +30,101 @@ Read about the journey on [Substack](https://allardqjy.substack.com/p/nano-learn
 
 ---
 
+## Getting Started (Recommended)
 
-## Main Version — Elastic Workflow
+**Direct LLM API calls with intelligent batching** — Free, optimized, and modern approach using Google Gemini or OpenAI.
 
-- Uses an [Elastic Workflow](https://www.elastic.co/docs/explore-analyze/workflows) for both word generation and translations
-- Single API call replaces separate fetch + translate steps
-- Centralized configuration via your Elastic agent/tool
-- Includes per-device recent-cache, TTL and size controls
+### Why Use This Version?
+- 💰 **Nearly Free:** ~2 API calls/month with Gemini's free tier (vs ~100+ calls with other approaches)
+- 🔋 **Offline Resilient:** 50-word cache means widget works even without internet
+- ⚡ **Fast & Stable:** Words rotate at fixed intervals, no flickering on refresh
+- 🎯 **Simple Setup:** Just an API key, no infrastructure needed
+- 🌍 **High Quality:** Excellent translations across 20+ languages
 
-#### Customizations
-- **Languages:** Edit the `LANG_CONFIG` array in `script_elastic.js` to enable languages for translation and display. Each entry is an object with `code`, `name` and `include` (set `include: true` to use a language).
-- **Theme:** Edit the `THEME` variable in `script_elastic.js` to constrain generation (default: "anything").
+### Key Features
+- **Batch Mode:** Fetches 50 words in one API call, rotates through them over time (~2 calls/month vs ~100)
+- **Smart Rotation:** Configurable word rotation interval (5 minutes for testing, 1 hour for production)
+- **TTL-based Deduplication:** Remembers words for 24 hours to prevent repetition
+- **Theme Change Detection:** Immediate cache clear when theme changes
+- **Robust Error Handling:** Graceful fallbacks with user-friendly error messages
+- **Offline Resilient:** Operates with cached words when API unavailable
+- **Provider Flexibility:** Easy switching between Gemini (free) and OpenAI
 
+### Architecture Highlights
+- Pre-fetches words in batches, stores locally in `word_cache.json`
+- Rotates to new word at configured interval, stable across widget refreshes
+- Automatically refetches when cache runs low (< 10 words remaining)
+- Tracks display history with timestamps for intelligent deduplication
+- Clears cache immediately when `THEME` constant changes
 
-#### Local Caching
+📖 **[Read detailed technical documentation](docs/llm-batch-mode.md)** for architecture, configuration, and troubleshooting.
 
-- A local file is stored in `FileManager.documentsDirectory()` as `recent_words.json` to reduce showing the same word repeatedly. The path can be console logged by Scriptable. 
-- Adjust `RECENT_TTL_MS` and `RECENT_MAX` to control how recently-seen words are filtered.
+### Customizations
+- **Languages:** Edit the `LANG_CONFIG` array in `script_llm.js` (same as Elastic version)
+- **Theme:** Edit the `THEME` variable in `script_llm.js` (default: "anything")
+- **Rotation Interval:** Change `WORD_ROTATION_INTERVAL` (5 min testing, 60 min production)
+- **Batch Size:** Adjust `BATCH_SIZE` (default: 50 words per API call)
+- **Provider:** Change `ACTIVE_PROVIDER` to switch between `"gemini"` or `"openai"`
+- **Model:** Edit `PROVIDER_CONFIG` to use different models
 
+### Setup
 
-### Usage
+**Option 1: Use the setup helper script (recommended)**
 
-1. Set up Elastic Agent Builder tool with your word generation workflow
-2. Copy `script_elastic.js` (root of repo) to Scriptable
-3. Configure credentials (one-time — run inside Scriptable):
+1. Copy `setup_keychain.js` to Scriptable
+2. Run it once in Scriptable
+3. Select "Gemini API Key" (or "OpenAI API Key")
+4. Paste your API key from [Google AI Studio](https://aistudio.google.com/apikey)
+5. Copy `script_llm.js` to Scriptable and add widget
+
+**Option 2: Manual Keychain setup**
+
+Run this code once inside Scriptable to store your API key:
 
 ```javascript
-// One-time: run inside Scriptable to store keys in the system Keychain
-Keychain.set("ELASTIC_API_URL", "https://your-elasticsearch-endpoint/...");
-Keychain.set("ELASTIC_API_KEY", "base64_api_key_here");
-Keychain.set("ELASTIC_TOOL_ID", "word.of.the.day.multilingual");
+// One-time: run inside Scriptable to store key in system Keychain
+Keychain.set("GEMINI_API_KEY", "your-gemini-api-key-here");
+// Or for OpenAI:
+// Keychain.set("OPENAI_API_KEY", "your-openai-api-key-here");
 ```
 
+**For Node.js testing:**
+```bash
+export GEMINI_API_KEY="your-key-here"
+node script_llm.js
+```
+
+### Why Gemini 3.1 Flash-Lite Preview?
+- ✅ **Free tier** - No usage limits, perfect for batch mode (~2 calls/month)
+- ✅ **Translation-optimized** - Specifically designed for translation tasks
+- ✅ **High-quality output** - Excellent translation accuracy across 20+ languages
+- ✅ **Latest generation** - Gemini 3.1 (newest available)
+- ✅ **Fast response time** - Optimized for quick API responses
+
+---
+
+## Alternative: Elastic Workflow
+
+For teams with existing Elastic infrastructure, an **Elastic Workflow integration** is available. This approach centralizes word generation and translation logic in your Elastic stack.
+
+**Key difference:** Single API call per widget refresh (~100-720/month) vs batch mode (~2/month).
+
+**Best for:**
+- Organizations already using Elastic
+- Teams needing centralized configuration
+- Use cases requiring Elastic observability features
+
+📖 **[Full Elastic Workflow documentation](docs/elastic-workflow.md)** — Setup, configuration, and comparison guide.
+
+**Quick Start:**
+1. Set up Elastic Agent Builder workflow (word generation + translations)
+2. Copy `script_elastic.js` to Scriptable
+3. Configure via Keychain: `ELASTIC_API_URL`, `ELASTIC_API_KEY`, `ELASTIC_TOOL_ID`
 4. Add widget
 
+---
 
-## Alternatives
+## Other Alternatives
 
 If you prefer a simpler local or public-API approach, two alternatives are available in the `scripts/` folder.
 
