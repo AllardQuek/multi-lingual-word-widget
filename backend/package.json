@@ -1,0 +1,19 @@
+{
+  "name": "multi-lingual-word-widget-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal backend API for multilingual word generation",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.1.0"
+  }
+}
