@@ -132,13 +132,18 @@ if (isScriptable) {
 
 // Create empty cache structure
 function createEmptyCache() {
-  return {
+  const cache = {
+    currentTheme: THEME,
+    themes: {}
+  };
+  cache.themes[THEME] = {
     current_word_index: 0,
     current_word_timestamp: 0,
-    theme: THEME,
     batch: [],
-    history: []
+    history: [],
+    last_used: Date.now()
   };
+  return cache;
 }
 
 // Load word cache from disk
@@ -156,19 +161,31 @@ function loadWordCache() {
     if (!raw) return createEmptyCache();
     const parsed = JSON.parse(raw);
     
-    // Validate structure
-    if (!parsed.batch || !Array.isArray(parsed.batch)) {
+    // Check if it's the old flat structure and migrate
+    if (parsed.batch && Array.isArray(parsed.batch)) {
+      console.log('Migrating old cache format to multi-theme format');
+      const oldTheme = parsed.theme || THEME;
+      const newCache = {
+        currentTheme: oldTheme,
+        themes: {}
+      };
+      newCache.themes[oldTheme] = {
+        current_word_index: parsed.current_word_index || 0,
+        current_word_timestamp: parsed.current_word_timestamp || 0,
+        batch: parsed.batch || [],
+        history: parsed.history || [],
+        last_used: Date.now()
+      };
+      return newCache;
+    }
+    
+    // Validate new structure
+    if (!parsed.themes || typeof parsed.themes !== 'object') {
       console.log('Invalid cache structure, starting fresh');
       return createEmptyCache();
     }
     
-    return {
-      current_word_index: parsed.current_word_index || 0,
-      current_word_timestamp: parsed.current_word_timestamp || 0,
-      theme: parsed.theme || THEME,
-      batch: parsed.batch || [],
-      history: parsed.history || []
-    };
+    return parsed;
   } catch (e) {
     console.log('Failed to load cache:', e);
     return createEmptyCache();
@@ -178,9 +195,36 @@ function loadWordCache() {
 // Save word cache to disk
 function saveWordCache(cache) {
   try {
-    // Clean history (apply TTL filter only)
     const now = Date.now();
-    cache.history = cache.history.filter(h => (now - (h.ts || 0)) <= DEDUP_TTL_MS);
+    
+    // Clean history for all themes and prune themes
+    const MAX_THEMES = 5;
+    const themeNames = Object.keys(cache.themes);
+    
+    // Set current theme last_used
+    if (cache.themes[cache.currentTheme]) {
+        cache.themes[cache.currentTheme].last_used = now;
+    }
+    
+    if (themeNames.length > MAX_THEMES) {
+      // Sort by last_used descending
+      themeNames.sort((a, b) => (cache.themes[b].last_used || 0) - (cache.themes[a].last_used || 0));
+      
+      // Keep only top MAX_THEMES
+      for (let i = MAX_THEMES; i < themeNames.length; i++) {
+        const themeToRemove = themeNames[i];
+        if (themeToRemove !== cache.currentTheme) {
+          console.log(`Pruning old theme from cache: "${themeToRemove}"`);
+          delete cache.themes[themeToRemove];
+        }
+      }
+    }
+    
+    for (const theme of Object.keys(cache.themes)) {
+      if (cache.themes[theme] && cache.themes[theme].history) {
+        cache.themes[theme].history = cache.themes[theme].history.filter(h => (now - (h.ts || 0)) <= DEDUP_TTL_MS);
+      }
+    }
     
     const s = JSON.stringify(cache, null, 2);
     if (isScriptable && fm) {
@@ -210,31 +254,35 @@ function addWordToHistory(cache, wordData) {
   if (!wordId) return;
   
   // Remove if already in history
-  cache.history = cache.history.filter(h => h.id !== wordId);
+  const themeCache = cache.themes[cache.currentTheme];
+  if (!themeCache) return;
+  
+  themeCache.history = themeCache.history.filter(h => h.id !== wordId);
   
   // Add to front with timestamp
-  cache.history.unshift({
+  themeCache.history.unshift({
     id: wordId,
     ts: Date.now()
   });
   
-  console.log(`Added "${wordData.word}" to history (${cache.history.length} total)`);
+  console.log(`Added "${wordData.word}" to history (${themeCache.history.length} total)`);
 }
 
 // Get fallback word from cache for offline/error display
 function selectFallbackWord(cache) {
   try {
-    if (!cache.batch || cache.batch.length === 0) {
+    const themeCache = cache.themes[cache.currentTheme];
+    if (!themeCache || !themeCache.batch || themeCache.batch.length === 0) {
       return null;
     }
     
     // Use current word if available
-    if (cache.current_word_index < cache.batch.length) {
-      return cache.batch[cache.current_word_index];
+    if (themeCache.current_word_index < themeCache.batch.length) {
+      return themeCache.batch[themeCache.current_word_index];
     }
     
     // Otherwise, use first word in batch
-    return cache.batch[0];
+    return themeCache.batch[0];
   } catch (e) {
     console.log('Failed to select fallback word:', e);
     return null;
@@ -393,40 +441,47 @@ async function fetchWordBatch(count, excludeWords, theme) {
 // Get current word based on rotation interval
 function getCurrentWord(cache) {
   const now = Date.now();
+  const themeCache = cache.themes[cache.currentTheme];
   
   // Check if batch is empty
-  if (!cache.batch || cache.batch.length === 0) {
+  if (!themeCache || !themeCache.batch || themeCache.batch.length === 0) {
     console.log('Cache batch is empty, need to fetch words');
     return null;
   }
   
   // Check if we need to rotate to next word
-  const timeSinceRotation = now - cache.current_word_timestamp;
+  const timeSinceRotation = now - themeCache.current_word_timestamp;
   if (timeSinceRotation >= WORD_ROTATION_INTERVAL) {
     console.log(`Rotation interval elapsed (${Math.floor(timeSinceRotation / 1000)}s), advancing to next word`);
     
     // Advance to next word
-    cache.current_word_index++;
-    cache.current_word_timestamp = now;
+    themeCache.current_word_index++;
+    themeCache.current_word_timestamp = now;
     
     // Wrap around if we've exhausted batch
-    if (cache.current_word_index >= cache.batch.length) {
+    if (themeCache.current_word_index >= themeCache.batch.length) {
       console.log('Reached end of batch, wrapping to start');
-      cache.current_word_index = 0;
+      themeCache.current_word_index = 0;
     }
     
-    console.log(`Now showing word ${cache.current_word_index + 1} of ${cache.batch.length}`);
+    console.log(`Now showing word ${themeCache.current_word_index + 1} of ${themeCache.batch.length}`);
   } else {
     console.log(`Still within rotation interval, showing same word (${Math.floor(timeSinceRotation / 1000)}s elapsed)`);
   }
   
   // Return current word
-  return cache.batch[cache.current_word_index];
+  return themeCache.batch[themeCache.current_word_index];
 }
 
 // Ensure cache has enough words, fetch new batch if needed
 async function ensureCacheStocked(cache) {
-  const currentSize = cache.batch ? cache.batch.length : 0;
+  let themeCache = cache.themes[cache.currentTheme];
+  if (!themeCache) {
+    detectThemeChange(cache);
+    themeCache = cache.themes[cache.currentTheme];
+  }
+  
+  const currentSize = themeCache.batch ? themeCache.batch.length : 0;
   
   if (currentSize >= MIN_CACHE_THRESHOLD) {
     console.log(`Cache OK: ${currentSize} words available`);
@@ -436,30 +491,38 @@ async function ensureCacheStocked(cache) {
   console.log(`Cache low (${currentSize} words), fetching new batch...`);
   
   // Get history IDs for deduplication
-  const excludeWords = cache.history ? cache.history.map(h => h.id) : [];
+  const excludeWords = themeCache.history ? themeCache.history.map(h => h.id) : [];
   
   // Fetch new batch
-  const newWords = await fetchWordBatch(BATCH_SIZE, excludeWords, cache.theme);
+  const newWords = await fetchWordBatch(BATCH_SIZE, excludeWords, cache.currentTheme);
   
   // Append to existing batch (don't waste remaining words)
-  if (!cache.batch) {
-    cache.batch = [];
+  if (!themeCache.batch) {
+    themeCache.batch = [];
   }
-  cache.batch.push(...newWords);
+  themeCache.batch.push(...newWords);
   
-  console.log(`Cache restocked. Now have ${cache.batch.length} words.`);
+  console.log(`Cache restocked. Now have ${themeCache.batch.length} words.`);
 }
 
 // Detect theme change and clear cache if needed
 function detectThemeChange(cache) {
-  if (cache.theme !== THEME) {
-    console.log(`Theme changed from "${cache.theme}" to "${THEME}". Clearing cache.`);
-    cache.batch = [];
-    cache.current_word_index = 0;
-    cache.current_word_timestamp = 0;
-    cache.theme = THEME;
+  if (cache.currentTheme !== THEME) {
+    console.log(`Theme changed from "${cache.currentTheme}" to "${THEME}". Changing active theme bucket.`);
+    cache.currentTheme = THEME;
+  }
+  
+  if (!cache.themes[THEME]) {
+    cache.themes[THEME] = {
+      current_word_index: 0,
+      current_word_timestamp: 0,
+      batch: [],
+      history: [],
+      last_used: Date.now()
+    };
     return true;
   }
+  
   return false;
 }
 
@@ -608,10 +671,12 @@ async function main() {
     
     // Load cache
     const cache = loadWordCache();
-    console.log(`Loaded cache: ${cache.batch.length} words, index ${cache.current_word_index}, theme "${cache.theme}"`);
     
-    // Check for theme change
+    // Check for theme change and create new storage if needed
     detectThemeChange(cache);
+    
+    const themeCache = cache.themes[cache.currentTheme];
+    console.log(`Loaded cache for theme "${cache.currentTheme}": ${themeCache.batch.length} words, index ${themeCache.current_word_index}`);
     
     // Ensure we have words in cache (fetch if needed)
     await ensureCacheStocked(cache);
