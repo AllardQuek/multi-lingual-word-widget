@@ -178,3 +178,33 @@ bun install
 export $(grep -v '^#' .env | xargs)
 bun run start
 ```
+
+### Test Deployed Service
+
+Run a deployment smoke test (health, generate, invalid-request validation):
+
+```bash
+cd backend
+bun run test:deploy
+```
+
+Use a different deployment URL if needed:
+
+```bash
+cd backend
+BASE_URL="https://your-service.onrender.com" bun run test:deploy
+```
+
+### Scriptable Client Using Deployed Backend
+
+To run Scriptable against your deployed Render service (instead of direct provider calls):
+
+1. Copy `script_backend.js` to Scriptable
+2. Add widget and run
+
+Notes:
+- `script_backend.js` keeps the same local cache/rotation/fallback behavior as `script_llm.js`
+- Backend request contract is minimal (`count` + `theme`)
+- Deduplication remains client-side via local history cache
+- `script_backend.js` uses `https://multi-lingual-word-widget.onrender.com` by default
+- `setup_keychain.js` remains the direct-LLM setup helper (Gemini/OpenAI keys)
