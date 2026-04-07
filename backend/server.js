@@ -8,6 +8,7 @@ const cors = require("@fastify/cors");
 
 const PORT = Number(process.env.PORT || 8787);
 const ALLOW_ORIGIN = process.env.ALLOW_ORIGIN || "*";
+const LOG_LEVEL = process.env.LOG_LEVEL || "info";
 
 const ACTIVE_PROVIDER = (process.env.ACTIVE_PROVIDER || "gemini").toLowerCase();
 const LLM_TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS || 15000);
@@ -59,7 +60,10 @@ const limiterStore = new Map();
 
 const app = Fastify({
   trustProxy: true,
-  logger: false,
+  logger: {
+    level: LOG_LEVEL,
+    redact: ["req.headers.authorization", "req.headers.cookie"]
+  },
   bodyLimit: 16 * 1024
 });
 
@@ -157,7 +161,7 @@ function buildBatchPrompt(count, theme) {
   ];
 }
 
-async function callLLM(messages) {
+async function callLLM(messages, logger = app.log) {
   const provider = PROVIDER_CONFIG[ACTIVE_PROVIDER];
   if (!provider) {
     throw new Error(`Unsupported provider: ${ACTIVE_PROVIDER}`);
@@ -166,9 +170,16 @@ async function callLLM(messages) {
     throw new Error(`Missing API key for provider: ${ACTIVE_PROVIDER}`);
   }
 
+  const start = Date.now();
+  logger.info(
+    { provider: ACTIVE_PROVIDER, model: provider.model, timeoutMs: LLM_TIMEOUT_MS },
+    "llm_call_start"
+  );
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 
+  const fetchStart = Date.now();
   try {
     const response = await fetch(`${provider.baseURL}/chat/completions`, {
       method: "POST",
@@ -183,6 +194,9 @@ async function callLLM(messages) {
       }),
       signal: controller.signal
     });
+
+    const fetchEnd = Date.now();
+    logger.info({ statusCode: response.status, fetchMs: fetchEnd - fetchStart }, "llm_fetch_complete");
 
     const payload = await response.json();
 
@@ -199,7 +213,13 @@ async function callLLM(messages) {
       throw new Error("Provider returned an empty completion.");
     }
 
+    const end = Date.now();
+    logger.info({ totalMs: end - start }, "llm_call_complete");
     return content;
+  } catch (err) {
+    const end = Date.now();
+    logger.error({ err, totalMs: end - start }, "llm_call_error");
+    throw err;
   } finally {
     clearTimeout(timeout);
   }
@@ -237,59 +257,74 @@ async function start() {
     allowedHeaders: ["Content-Type", "x-client-id"]
   });
 
-  app.get("/health", async () => {
+  app.get("/health", async (req) => {
+    req.log.debug("health_check");
     return { ok: true, provider: ACTIVE_PROVIDER };
   });
 
   app.post("/api/word", async (req, reply) => {
-  const requestId = getRequestId();
+    const requestId = getRequestId();
+    const clientKey = getClientKey(req);
 
-  try {
-    const rateLimitError = checkRateLimit(req);
-    if (rateLimitError) {
-      reply.header("Retry-After", String(rateLimitError.retryAfterSec));
-      return reply.status(429).send({
-        error: rateLimitError.error
-      });
-    }
+    req.log.info(
+      { requestId, clientKey, theme: req.body?.theme, count: req.body?.count },
+      "api_word_request"
+    );
 
-    const validationError = validateBody(req.body);
-    if (validationError) {
-      return reply.status(400).send({
+    try {
+      const rateLimitError = checkRateLimit(req);
+      if (rateLimitError) {
+        req.log.warn(
+          { requestId, clientKey, retryAfterSec: rateLimitError.retryAfterSec },
+          "api_word_rate_limited"
+        );
+        reply.header("Retry-After", String(rateLimitError.retryAfterSec));
+        return reply.status(429).send({
+          error: rateLimitError.error
+        });
+      }
+
+      const validationError = validateBody(req.body);
+      if (validationError) {
+        req.log.warn({ requestId, clientKey, validationError }, "api_word_invalid_request");
+        return reply.status(400).send({
+          error: {
+            code: "invalid_request",
+            message: validationError,
+            requestId
+          }
+        });
+      }
+
+      const theme = normalizeTheme(req.body.theme);
+      const count = normalizeCount(req.body.count);
+      req.log.info({ requestId, clientKey, theme, count }, "api_word_generate_start");
+
+      const prompt = buildBatchPrompt(count, theme);
+      const completion = await callLLM(prompt, req.log);
+      const words = parseBatchResponse(completion);
+      req.log.info({ requestId, countReturned: words.length }, "api_word_generate_success");
+
+      return reply.send(words);
+    } catch (err) {
+      const message = err && err.message ? err.message : "Unknown error";
+      const isTimeout = /aborted|abort/i.test(message);
+      const code = isTimeout ? "provider_timeout" : "provider_error";
+
+      req.log.error({ err, requestId, clientKey, code }, "api_word_generate_failed");
+      return reply.status(isTimeout ? 504 : 502).send({
         error: {
-          code: "invalid_request",
-          message: validationError,
+          code,
+          message: "Failed to generate word.",
+          details: message,
           requestId
         }
       });
     }
-
-    const theme = normalizeTheme(req.body.theme);
-    const count = normalizeCount(req.body.count);
-
-    const prompt = buildBatchPrompt(count, theme);
-    const completion = await callLLM(prompt);
-    const words = parseBatchResponse(completion);
-
-    return reply.send(words);
-  } catch (err) {
-    const message = err && err.message ? err.message : "Unknown error";
-    const isTimeout = /aborted|abort/i.test(message);
-
-    return reply.status(isTimeout ? 504 : 502).send({
-      error: {
-        code: isTimeout ? "provider_timeout" : "provider_error",
-        message: "Failed to generate word.",
-        details: message,
-        requestId
-      }
-    });
-  }
   });
 
   await app.listen({ port: PORT, host: "0.0.0.0" });
-  console.log(`Backend API listening on port ${PORT}`);
-  console.log(`Provider: ${ACTIVE_PROVIDER}`);
+  app.log.info({ port: PORT, provider: ACTIVE_PROVIDER, logLevel: LOG_LEVEL }, "backend_started");
 }
 
 start().catch((err) => {
