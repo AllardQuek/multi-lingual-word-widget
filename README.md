@@ -146,3 +146,35 @@ If you prefer a simpler local or public-API approach, two alternatives are avail
 #### Usage
 1. Copy `scripts/script_api.js` to Scriptable
 1. Configure the top-level constants (`USER_LANGUAGE_CODES`, `WORDS_TO_FETCH`, etc.)
+
+---
+
+## Backend API (v1 Minimal)
+
+A minimal backend implementation is available in [backend/](backend/) for multi-user support without a database.
+
+### Highlights
+- Anonymous `POST /api/word` endpoint
+- Provider abstraction (`gemini` or `openai`)
+- Basic request validation and timeout handling
+- Simple per-IP or `x-client-id` in-memory rate limiting
+
+### Quick Start
+```bash
+cd backend
+cp .env.example .env
+pnpm install
+export $(grep -v '^#' .env | xargs)
+pnpm start
+```
+
+See [docs/backend-v1.md](docs/backend-v1.md) for API contract and deployment notes.
+
+If you prefer Bun:
+```bash
+cd backend
+cp .env.example .env
+bun install
+export $(grep -v '^#' .env | xargs)
+bun run start
+```
